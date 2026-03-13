@@ -94,3 +94,10 @@ res_inta_rn = LQGController.simulate_reach(
 )
 
 model_utils.plot_reach(res_inta_rn, title="IntA→RN perturbation")
+
+
+# behavior summary metrics
+print("Baseline:", model_utils.compute_behavior_metrics(baseline, params.target))
+print("IntA→RN:",  model_utils.compute_behavior_metrics(res_inta_rn, params.target))
+print("General IntA:",  model_utils.compute_behavior_metrics(res_inta_general, params.target))
+print("Mossy:",  model_utils.compute_behavior_metrics(res_mossy, params.target))
