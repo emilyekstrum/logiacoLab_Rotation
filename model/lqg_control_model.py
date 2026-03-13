@@ -196,7 +196,7 @@ def make_time_basis(T, n_basis=8, width=10):
 def initial_feedforward_weights(n_basis=8, n_u = 2):
     # initialize feedforward weights to zero
     # initially there is no learned feedforward command and the system relies entirely on feedback control to achieve the target state.
-    return np.zeros((n_basis, n_u)) 
+    return np.zeros((n_basis, n_u), dtype=float) 
 
 
 # simulate a reach with LQG control and cerebellar adaptation
