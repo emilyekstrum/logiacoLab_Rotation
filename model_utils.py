@@ -1,5 +1,10 @@
 """ Utils for LQG control model"""
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+
 import numpy as np
 from scipy.linalg import solve_discrete_are
 from model.lqg_control_model import LQGController
