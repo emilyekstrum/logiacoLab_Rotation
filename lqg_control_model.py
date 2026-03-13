@@ -166,3 +166,67 @@ class Perturbation:
         if self.observer_bias is None:
             #default bias for mossy perturbation: overestimate outward position, underestimate upward position, and underestimate velocities
             self.observer_bias = np.array([0.0, 0.0, 0.8, 0.4], dtype=float)
+
+
+# simulate a reach with LQG control and cerebellar adaptation
+def simulate_reach(
+        params: LQGParams,
+        K, L, Q, R, W, V, 
+        Phi, ff_weights,
+        perturbation: Perturbation = None,
+        x0=None,
+        rng=None):
+    
+    """ Simulates a single reach using the LQG control model with cerebellar adaptation. """
+
+    if rng is None: 
+        rng = np.random.default_rng()
+    if x0 is None:
+        x0 = np.zeros(4) # start at rest with paw at origin
+
+    A, B, C = build_state_space(params)
+    T = params.T
+
+    x = np.zeros((t, 4)) # state trajectory
+    xhat_pred = zp.zeros((T, 4)) # predicted state trajectory from internal model before observing current state
+    xhat = np.zeros((T, 4)) # estimated state trajectory from internal model
+    y = np.zeros((T, 4)) # observed state trajectory with measurement noise
+    yhat = np.zeros((T, 4)) # predicted observations from internal model
+    ytilde = np.zeros((T, 4)) # observation prediction error trajectory
+    u_nom = np.zeros((T, 2)) # nominal control input trajectory from feedback controller
+    u_app = np.zeros((T, 2)) # applied control input trajectory including feedforward command and perturbations
+    u_ff = Phi @ ff_weights # feedforward control command trajectory from cerebellar adaptation
+
+    x[0] = x0 # initialize true state trajectory with initial state
+    xhat[0] = x0 # initialize state estimate to true initial state
+    y[0] = C @ x[0] + rng.multivariate_normal(np.zeros(4), V) # initial observation with measurement noise
+    yhat[0] = C @ xhat[0] # initial predicted observation from internal model
+    ytilde[0] = y[0] - yhat[0] # initial observation prediction error
+
+    target = params.target
+
+    for t in range(1, T):
+        # prediction step
+        xhat_pred[t] = A @ xhat[t-1] + B @ u_app[t-1] # predict next state based on previous state estimate and applied control input
+
+        # mossy fiber perturbation enters observer/internal model
+        if perturbation is not None and perturbation.kind == "mossy":
+            if perturbation.oneset_idx <= t < perturbation.onset_idx + perturbation.duration:
+                xhat_pred[t] += perturbation.observer_bias # add bias to predicted state to simulate altered sensory input from mossy fiber perturbation
+
+        # predicted observation
+        yhat[t] = C @ xhat_pred[t] 
+
+        # real observation
+        obs_noise = rng.multivariate_normal(np.zeros(4), V) # sample measurement noise for current time step
+        y[t] = C @ x[t] + obs_noise # true observation with measurement noise
+
+        # prediction error
+        ytilde[t] = y[t] - yhat[t] # compute observation prediction
+
+        #control around target state
+        state_error = xhat[t] - target # compute error between current state estimate and target state
+        u_nom[t] = -K @ state_error + u_ff[t] # compute nominal control input from feedback controller
+
+        # applied control perturbed at output
+        u_app[t] = u_nom[t].copy()
