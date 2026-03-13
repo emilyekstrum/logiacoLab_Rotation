@@ -230,3 +230,37 @@ def simulate_reach(
 
         # applied control perturbed at output
         u_app[t] = u_nom[t].copy()
+
+        if perturbation is not None and perturbation.kind in ['inta_rn', 'inta_general']:
+            if perturbation.onset_idx <= t < perturbation.onset_idx + perturbation.duration:
+                u_app[t] += perturbation.pulse # add perturbation pulse to control input to simulate intra-cerebellar or general motor output perturbation
+
+            if perturbation.kind == 'inta_general':
+                # make less selective
+                u_app[t] += rng.normal(0, 0.5, size=2) # add some random noise to the control input to simulate a more general perturbation that affects multiple aspects of motor output
+
+        # process noise
+        proc_noise = rng.multivariate_normal(np.zeros(4), W) # sample process noise for current time step
+
+        # plant update
+        x[t] = A @ x[t-1] + B @ u_app[t] + proc_noise # update true state based on previous state, applied control input, and process noise
+
+
+    # trial cost
+    J = 0.0
+    for t in range(T):
+        state_error = x[t] - target
+        J += state_error.T @ Q @ state_error + u_app[t].T @ R @ u_app[t] # accumulate cost based on state error and control effort
+
+    return {
+        'x': x, # true state trajectory
+        'xhat' : xhat, # estimated state trajectory from internal model
+        'xhat_pred' : xhat_pred, # predicted state trajectory from internal model before observing current state
+        'y': y, # observed state trajectory with measurement noise
+        'yhat': yhat, # predicted observations from internal model
+        'ytilde': ytilde, # observation prediction error trajectory
+        'u_nom': u_nom, # nominal control input trajectory from feedback controller
+        'u_app': u_app, # applied control input trajectory including feedforward command and perturbations
+        'u_ff': u_ff, # feedforward control command trajectory from cerebellar adaptation
+        'J': J # total cost for the trial
+    }
