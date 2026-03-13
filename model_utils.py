@@ -19,7 +19,7 @@ def stimulus_aligned_time(T, onset_idx, dt):
 
 def plot_reach(result, params, perturbation=None, title="Reach"):
     """Plot reach trajectory and velocity profiles.
-    If a perturbation is used, the x-axis is aligned so stimulus = 0 and the stimulation window is shaded."""
+    If a perturbation is used, the x-axis is aligned so stimulus onset is 0 and the stimulation window is shaded."""
 
     x = result["x"]
     T = len(x)
@@ -34,57 +34,85 @@ def plot_reach(result, params, perturbation=None, title="Reach"):
         stim_start = None
         stim_end = None
 
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+    # compute acceleration from velocity (derivative)
+    v_out = x[:, 2]
+    v_up = x[:, 3]
+    acc_out = np.diff(v_out, prepend=v_out[0]) / params.dt
+    acc_up = np.diff(v_up, prepend=v_up[0]) / params.dt
+
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
 
     # trajectory plot
-    axes[0].plot(x[:, 0], x[:, 1], color="black")
-    axes[0].scatter([x[0, 0]], [x[0, 1]], label="start")
-    axes[0].scatter([x[-1, 0]], [x[-1, 1]], label="end")
+    axes[0, 0].plot(x[:, 0], x[:, 1], color="black")
+    axes[0, 0].scatter([x[0, 0]], [x[0, 1]], label="start")
+    axes[0, 0].scatter([x[-1, 0]], [x[-1, 1]], label="end")
 
-    axes[0].set_xlabel("Outward position")
-    axes[0].set_ylabel("Upward position")
-    axes[0].set_title(f"{title}: trajectory")
-    axes[0].legend()
+    axes[0, 0].set_xlabel("Outward position")
+    axes[0, 0].set_ylabel("Upward position")
+    axes[0, 0].set_title(f"{title}: trajectory")
+    axes[0, 0].legend()
 
     # arm outward velocity plot
-    axes[1].plot(t, x[:, 2], color="black")
+    axes[0, 1].plot(t, v_out, color="black")
 
     if perturbation is not None:
-        axes[1].axvspan(stim_start, stim_end, color="#4A90E2", alpha=0.25)
-        axes[1].text(
+        axes[0, 1].axvspan(stim_start, stim_end, color="#4A90E2", alpha=0.25)
+        axes[0, 1].text(
             (stim_end)/2,
-            axes[1].get_ylim()[1]*0.9,
+            axes[0, 1].get_ylim()[1]*0.9,
             "Stim",
             ha="left",
             color="#4A90E2"
         )
-        axes[1].axvline(0, color="red", linestyle="--", linewidth=1)
+        axes[0, 1].axvline(0, color="red", linestyle="--", linewidth=1)
 
-    axes[1].axhline(0, color="gray", linestyle="--", linewidth=1)
+    axes[0, 1].axhline(0, color="gray", linestyle="--", linewidth=1)
 
-    axes[1].set_xlabel("Time from stimulus (s)")
-    axes[1].set_ylabel("Outward velocity")
-    axes[1].set_title(f"{title}: outward velocity")
+    axes[0, 1].set_xlabel("Time from stimulus (s)")
+    axes[0, 1].set_ylabel("Outward velocity")
+    axes[0, 1].set_title(f"{title}: outward velocity")
 
     # arm upward velocity plot
-    axes[2].plot(t, x[:, 3], color="black")
+    axes[1, 0].plot(t, v_up, color="black")
 
     if perturbation is not None:
-        axes[2].axvspan(stim_start, stim_end, color="#4A90E2", alpha=0.25)
-        axes[1].text(
+        axes[1, 0].axvspan(stim_start, stim_end, color="#4A90E2", alpha=0.25)
+        axes[1, 0].text(
             (stim_end)/2,
-            axes[1].get_ylim()[1]*0.9,
+            axes[1, 0].get_ylim()[1]*0.9,
             "Stim",
             ha="left",
             color="#4A90E2"
         )
-        axes[2].axvline(0, color="red", linestyle="--", linewidth=1)
+        axes[1, 0].axvline(0, color="red", linestyle="--", linewidth=1)
 
-    axes[2].axhline(0, color="gray", linestyle="--", linewidth=1)
+    axes[1, 0].axhline(0, color="gray", linestyle="--", linewidth=1)
 
-    axes[2].set_xlabel("Time from stimulus (s)")
-    axes[2].set_ylabel("Upward velocity")
-    axes[2].set_title(f"{title}: upward velocity")
+    axes[1, 0].set_xlabel("Time from stimulus (s)")
+    axes[1, 0].set_ylabel("Upward velocity")
+    axes[1, 0].set_title(f"{title}: upward velocity")
+
+    # acceleration plot (both outward and upward)
+    axes[1, 1].plot(t, acc_out, color="blue", label="Outward", alpha=0.7)
+    axes[1, 1].plot(t, acc_up, color="green", label="Upward", alpha=0.7)
+
+    if perturbation is not None:
+        axes[1, 1].axvspan(stim_start, stim_end, color="#4A90E2", alpha=0.25)
+        axes[1, 1].text(
+            (stim_end)/2,
+            axes[1, 1].get_ylim()[1]*0.9,
+            "Stim",
+            ha="left",
+            color="#4A90E2"
+        )
+        axes[1, 1].axvline(0, color="red", linestyle="--", linewidth=1)
+
+    axes[1, 1].axhline(0, color="gray", linestyle="--", linewidth=1)
+
+    axes[1, 1].set_xlabel("Time from stimulus (s)")
+    axes[1, 1].set_ylabel("Acceleration")
+    axes[1, 1].set_title(f"{title}: acceleration")
+    axes[1, 1].legend()
 
     plt.tight_layout()
     plt.show()
