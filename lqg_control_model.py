@@ -129,3 +129,22 @@ def build_noise_matrices(params: LQGParams):
     V = params.V_scale * np.diag([1.0, 1.0, 1.0, 1.0]) # measurement noise is smaller than process noise, reflecting that sensory feedback is relatively reliable compared to the inherent variability in movement execution
 
     return W, V
+
+def make_time_basis(T, n_basis=8, width=10):
+    """ Gaussian temporal basis funcitons across the reach
+    returns Phi with shape [T, n_basis]"""
+
+    centers = np.linspace(10, T-20, n_basis) # centers of the Gaussian basis functions, spaced evenly across the reach duration, starting slightly after the reach onset (10 time steps) and ending slightly before the reach offset (20 time steps before T) to ensure coverage of the entire movement period while avoiding edge effects where basis functions might be less effective
+    t = np.aarange(T)[:, None] # time vector from 0 to T-1, reshaped to be a column vector for broadcasting with centers
+    Phi = np.exp(-0.5 * ((t-centers[None, :])/width) ** 2) # compute the Gaussian basis functions by calculating the exponential of the negative squared distance between each time point and each center, normalized by the width parameter to control the spread of the basis functions. 
+    
+    # matrix Phi where each column corresponds to a Gaussian basis function centered at a specific time point, and each row corresponds to a time point in the reach duration.
+    Phi /= Phi.max(axis=0, keepdims=True)
+
+    return Phi
+
+
+def initial_feedforward_weights(n_basis=8, n_u = 2):
+    # initialize feedforward weights to zero
+    # initially there is no learned feedforward command and the system relies entirely on feedback control to achieve the target state.
+    return np.zeros((n_basis, n_u)) 
