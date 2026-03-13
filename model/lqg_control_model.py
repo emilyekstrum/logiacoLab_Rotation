@@ -135,7 +135,7 @@ def build_state_space(params: LQGParams):
     
     # observe all satate variables initially
     # defines what the cerebellum receives as input for state estimation and learning
-    C = np.eye(4)
+    C = np.eye(4, dtype=float)
 
     return A, B, C
 
