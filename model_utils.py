@@ -2,7 +2,7 @@
 
 import numpy as np
 from scipy.linalg import solve_discrete_are
-from lqg_control_model import LQGController
+from model.lqg_control_model import LQGController
 import matplotlib.pyplot as plt
 
 
