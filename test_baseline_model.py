@@ -3,6 +3,7 @@
 import numpy as np
 from scipy.linalg import solve_discrete_are
 from lqg_control_model import LQGController
+import model_utils
 
 params = LQGController.Params()
 
@@ -50,7 +51,7 @@ res_mossy = LQGController.simulate_reach(
     rng=np.random.default_rng(3)
 )
 
-LQGController.plot_reach(res_mossy, title="Mossy fiber perturbation")
+model_utils.plot_reach(res_mossy, title="Mossy fiber perturbation")
 
 # simulate a reach with a inta general perturbation
 inta_general_pert = LQGController.Perturbation(
@@ -71,7 +72,7 @@ res_inta_general = LQGController.simulate_reach(
     rng=np.random.default_rng(2)
 )
 
-LQGController.plot_reach(res_inta_general, title="General IntA perturbation")
+model_utils.plot_reach(res_inta_general, title="General IntA perturbation")
 
 # simulate a reach with inta rn perturbation
 inta_rn_pert = LQGController.Perturbation(
@@ -92,4 +93,4 @@ res_inta_rn = LQGController.simulate_reach(
     rng=np.random.default_rng(1)
 )
 
-LQGController.plot_reach(res_inta_rn, title="IntA→RN perturbation")
+model_utils.plot_reach(res_inta_rn, title="IntA→RN perturbation")
