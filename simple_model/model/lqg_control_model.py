@@ -1,5 +1,8 @@
 """ Linear Quadratic Gaussian (LQG) Control Model for cerebellar pathways using general kinematics.
 
+x(t) = A x(t-1) + B u(t-1) + w(t-1)  # state update with process noise
+y(t) = C x(t) + v(t)  # observation with measurement noise
+
 State:
 - x(t) : State vector representing the system's current state at time t.
     - P_out(t) : outward paw position at time t.
@@ -17,15 +20,22 @@ Intenral model/estimator: Cerebellum
 Controller: motor circuits / motor cortex 
 
 Parameters: 
-A: State transition matrix representing the dynamics of the system.
-B: Control input matrix representing how control inputs affect the state.
+A: State transition matrix representing the dynamics of the system. 
+    - array (4, 4): 4D state space.
+B: Control input matrix representing how control inputs affect the state. 
+    - array (4, 2): 4D state space, 2D control input.
 Q: State cost matrix representing the cost associated with being in a particular state.
+    - array (4, 4): 4D state space.
 R: Control cost matrix representing the cost associated with applying a particular control input.
+    - array (2, 2): 2D control input.
 C: Output matrix representing how the state is observed or measured.
+    - array (4, 4): 4D state space, 4D observation (initially observing all state variables).
 L: Kalman gain matrix representing how the estimator updates its state estimates based on new observations.
+    - array (4, 4): 4D state space, 4D observation.
 W: Process noise covariance matrix representing the uncertainty in the system dynamics.
+    - array (4, 4): 4D state space.
 V: Measurement noise covariance matrix representing the uncertainty in the observations.
-theta: adaptation weights representing the learning parameters for updating the internal model based on prediction errors.
+    - array (4, 4): 4D observation.
 """
 
 import numpy as np
@@ -60,8 +70,8 @@ class LQGParams:
 
     def __post_init__(self):
         if self.target is None:
-            #reach target at outward 1.0, upward 0.5, with zero termninal velocity
-            self.target = np.array([1.0, 0.5, 0.0, 0.0], dtype=float)
+            #reach target at outward 2.0, upward 2.0, with zero termninal velocity
+            self.target = np.array([2.0, 2.0, 0.0, 0.0], dtype=float)
         else:
             self.target = np.asarray(self.target, dtype=float)
             if self.target.shape != (4,):
@@ -307,7 +317,10 @@ def simulate_reach(
             y[t] = C @ x[t] + obs_noise # true observation with measurement noise
 
             # prediction error
-            ytilde[t] = y[t] - yhat[t] # compute observation prediction
+            ytilde[t] = y[t] - yhat[t] # compute observation prediction error
+            
+            # correction step (Kalman update)
+            xhat[t] = xhat_pred[t] + L @ ytilde[t] # correct predicted state using Kalman gain and observation error
 
             #control around target state
             state_error = xhat[t] - target # compute error between current state estimate and target state
