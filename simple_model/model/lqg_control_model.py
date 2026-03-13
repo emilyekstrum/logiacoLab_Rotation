@@ -95,14 +95,14 @@ class Perturbation:
             raise ValueError(f"kind must be one of {valid_kinds}, got {self.kind!r}")
 
         if self.pulse is None:
-            self.pulse = np.array([-2.0, -1.0], dtype=float)
+            self.pulse = np.array([-4.0, -3.0], dtype=float) # stronger braking force for inta_rn and inta_general perturbations
         else:
             self.pulse = np.asarray(self.pulse, dtype=float)
             if self.pulse.shape != (2,):
                 raise ValueError("pulse must have shape (2,) for [u_out, u_up].")
 
         if self.observer_bias is None:
-            self.observer_bias = np.array([0.0, 0.0, 0.8, 0.4], dtype=float)
+            self.observer_bias = np.array([0.0, 0.0, 2.0, 1.5], dtype=float) # adjust velocity bias to have stronger effect on velocity estimation
         else:
             self.observer_bias = np.asarray(self.observer_bias, dtype=float)
             if self.observer_bias.shape != (4,):
