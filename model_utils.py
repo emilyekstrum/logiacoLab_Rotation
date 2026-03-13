@@ -39,4 +39,39 @@ def plot_reach(result, title="Reach"):
     plt.show()
 
 
-def 
+def compute_behavior_metrics(result, target):
+    x = result["x"]
+    ytilde = result["ytilde"]
+    u_app = result["u_app"]
+
+    endpoint = x[-1, :2]
+    endpoint_error = np.linalg.norm(endpoint - target[:2])
+
+    outward_vel = x[:, 2]
+    upward_vel = x[:, 3]
+
+    peak_outward_vel = outward_vel.max()
+    min_outward_vel = outward_vel.min()
+
+    # correction metric
+    # after the minimum velocity, how much does velocity rebound
+    min_idx = np.argmin(outward_vel)
+    if min_idx < len(outward_vel) - 1:
+        rebound = outward_vel[min_idx+1:].max() - outward_vel[min_idx]
+        rebound_idx = min_idx + 1 + np.argmax(outward_vel[min_idx+1:])
+    else:
+        rebound = 0.0
+        rebound_idx = min_idx
+
+    innovation_norm = np.linalg.norm(ytilde, axis=1)
+    peak_innovation = innovation_norm.max()
+
+    return {
+        "endpoint_error": endpoint_error,
+        "peak_outward_vel": peak_outward_vel,
+        "min_outward_vel": min_outward_vel,
+        "rebound_magnitude": rebound,
+        "rebound_idx": rebound_idx,
+        "peak_innovation": peak_innovation,
+        "cost_J": result["J"]
+    }
