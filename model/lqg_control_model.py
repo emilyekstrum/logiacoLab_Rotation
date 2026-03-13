@@ -65,6 +65,41 @@ class LQGParams:
             self.target = np.asarray(self.target, dtype=float)
             if self.target.shape != (4,):
                 raise ValueError("Target state must be a 4-dimensional vector [p_out, p_up, v_out, v_up]")
+            
+@dataclass
+class Perturbation:
+    """ Perturbation configuration"""
+
+    kind: str = None # None, mossy, inta_rn, inta_general
+    onset_idx: int = 45 # start of perturbation in time steps, relative to reach onset
+    duration: int = 5 # duration of perturbation in time steps
+    pulse: np.array = None # shape (2,) for motor output pulse
+    observer_bias: np.ndarray = None # shape (4,) for mossy perturbation bias on state observation
+    general_noise_std: float = 0.15 # standard deviation of noise added to control input for general perturbation
+
+    def __post_init__(self) -> None:
+        valid_kinds = {None, "mossy", "inta_rn", "inta_general"}
+
+        if self.kind not in valid_kinds:
+            raise ValueError(f"kind must be one of {valid_kinds}, got {self.kind!r}")
+
+        if self.pulse is None:
+            self.pulse = np.array([-2.0, -1.0], dtype=float)
+        else:
+            self.pulse = np.asarray(self.pulse, dtype=float)
+            if self.pulse.shape != (2,):
+                raise ValueError("pulse must have shape (2,) for [u_out, u_up].")
+
+        if self.observer_bias is None:
+            self.observer_bias = np.array([0.0, 0.0, 0.8, 0.4], dtype=float)
+        else:
+            self.observer_bias = np.asarray(self.observer_bias, dtype=float)
+            if self.observer_bias.shape != (4,):
+                raise ValueError("observer_bias must have shape (4,) for state bias.")
+
+        if self.onset_idx < 0 or self.duration < 0:
+            raise ValueError("onset_idx and duration must be non-negative.")
+
 
 
 # Define linear kinematic system dynamics
@@ -153,24 +188,6 @@ def initial_feedforward_weights(n_basis=8, n_u = 2):
     # initialize feedforward weights to zero
     # initially there is no learned feedforward command and the system relies entirely on feedback control to achieve the target state.
     return np.zeros((n_basis, n_u)) 
-
-
-@dataclass
-class Perturbation:
-    kind: str = None # None, mossy, inta_rn, inta_general
-    onset_idx: int = 45 # start of perturbation in time steps, relative to reach onset
-    duration: int = 5 # duration of perturbation in time steps
-    pulse: np.array = None # shape (2,) for motor output pulse
-    observer_bias: np.ndarray = None # shape (4,) for mossy perturbation bias on state observation
-
-    def __post_init__(self):
-        if self.pulse is None:
-            #default decelerative pulse
-            self.pulse = np.array([-2.0, -1.0], dtype=float)
-
-        if self.observer_bias is None:
-            #default bias for mossy perturbation: overestimate outward position, underestimate upward position, and underestimate velocities
-            self.observer_bias = np.array([0.0, 0.0, 0.8, 0.4], dtype=float)
 
 
 # simulate a reach with LQG control and cerebellar adaptation
