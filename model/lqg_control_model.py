@@ -177,16 +177,19 @@ def build_noise_matrices(params: LQGParams):
     return W, V
 
 def make_time_basis(T, n_basis=8, width=10):
-    """ Gaussian temporal basis funcitons across the reach
-    returns Phi with shape [T, n_basis]"""
+    """Create Gaussian temporal basis functions with shape [T, n_basis]."""
+    if T <= 0:
+        raise ValueError("T must be positive.")
+    if n_basis <= 0:
+        raise ValueError("n_basis must be positive.")
+    if width <= 0:
+        raise ValueError("width must be positive.")
 
-    centers = np.linspace(10, T-20, n_basis) # centers of the Gaussian basis functions, spaced evenly across the reach duration, starting slightly after the reach onset (10 time steps) and ending slightly before the reach offset (20 time steps before T) to ensure coverage of the entire movement period while avoiding edge effects where basis functions might be less effective
-    t = np.aarange(T)[:, None] # time vector from 0 to T-1, reshaped to be a column vector for broadcasting with centers
-    Phi = np.exp(-0.5 * ((t-centers[None, :])/width) ** 2) # compute the Gaussian basis functions by calculating the exponential of the negative squared distance between each time point and each center, normalized by the width parameter to control the spread of the basis functions. 
+    centers = np.linspace(10, max(10, T - 20), n_basis) # centers start at 10 to avoid being too close to reach onset, and end at least 20 time steps before reach end to allow for learning effects to influence the reach trajectory
+    t = np.arange(T)[:, None] # time vector of shape [T, 1] for broadcasting with centers of shape [n_basis]
+    Phi = np.exp(-0.5 * ((t - centers[None, :]) / width) ** 2) # compute Gaussian basis functions for each time step and basis function center, resulting in a [T, n_basis] matrix where each column is a Gaussian function centered at a different time point in the reach
+    Phi /= np.maximum(Phi.max(axis=0, keepdims=True), 1e-12) # normalize each basis function to have a maximum value of 1, preventing numerical issues with very small values and ensuring that the feedforward command can scale appropriately based on the learned weights without being dominated by the shape of the basis functions
     
-    # matrix Phi where each column corresponds to a Gaussian basis function centered at a specific time point, and each row corresponds to a time point in the reach duration.
-    Phi /= Phi.max(axis=0, keepdims=True)
-
     return Phi
 
 
