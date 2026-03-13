@@ -112,20 +112,26 @@ def build_state_space(params: LQGParams):
 
     # x = [p_out, p_up, v_out, v_up]
     # control passive limb evolution with drag, and active control input with gain b
-    A = np.array([
-        [1, 0, dt, 0],
-        [0, 1, 0, dt],
-        [0, 0, drag, 0],
-        [0, 0, 0, drag]
-    ])
+    A = np.array(
+        [
+            [1.0, 0.0, dt, 0.0],
+            [0.0, 1.0, 0.0, dt],
+            [0.0, 0.0, drag, 0.0],
+            [0.0, 0.0, 0.0, drag],
+        ],
+        dtype=float,
+    )
 
     # maps motor commands to changes in velocity, which then affect position through A
-    B = np.array([
-        [0, 0],
-        [0, 0],
-        [b*dt, 0],
-        [0, b*dt]
-    ])
+    B = np.array(
+        [
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [b * dt, 0.0],
+            [0.0, b * dt],
+        ],
+        dtype=float,
+    )
     
     # observe all satate variables initially
     # defines what the cerebellum receives as input for state estimation and learning
