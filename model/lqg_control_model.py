@@ -348,3 +348,17 @@ def simulate_reach(
             'u_ff': u_ff, # feedforward control command trajectory from cerebellar adaptation
             'J': J # total cost for the trial
         }
+
+__all__ = [
+    "LQGParams",
+    "Perturbation",
+    "LQGController",
+    "build_state_space",
+    "build_cost_matrices",
+    "build_noise_matrices",
+    "dlqr",
+    "dlqe",
+    "make_time_basis",
+    "initial_feedforward_weights",
+    "simulate_reach",
+]
