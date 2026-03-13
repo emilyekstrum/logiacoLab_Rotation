@@ -51,3 +51,45 @@ res_mossy = LQGController.simulate_reach(
 )
 
 LQGController.plot_reach(res_mossy, title="Mossy fiber perturbation")
+
+# simulate a reach with a inta general perturbation
+inta_general_pert = LQGController.Perturbation(
+    kind='inta_general',
+    onset_idx=45,
+    duration=5,
+    pulse=np.array([-2.2, -1.0])
+)
+
+res_inta_general = LQGController.simulate_reach(
+    params=params,
+    K=K, L=L,
+    Q=Q, R=R,
+    W=W, V=V,
+    ff_weights=ff_weights,
+    Phi=Phi,
+    perturbation=inta_general_pert,
+    rng=np.random.default_rng(2)
+)
+
+LQGController.plot_reach(res_inta_general, title="General IntA perturbation")
+
+# simulate a reach with inta rn perturbation
+inta_rn_pert = LQGController.Perturbation(
+    kind='inta_rn',
+    onset_idx=45,
+    duration=5,
+    pulse=np.array([-2.2, -1.0])
+)
+
+res_inta_rn = LQGController.simulate_reach(
+    params=params,
+    K=K, L=L,
+    Q=Q, R=R,
+    W=W, V=V,
+    ff_weights=ff_weights,
+    Phi=Phi,
+    perturbation=inta_rn_pert,
+    rng=np.random.default_rng(1)
+)
+
+LQGController.plot_reach(res_inta_rn, title="IntA→RN perturbation")
