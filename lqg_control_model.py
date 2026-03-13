@@ -148,3 +148,21 @@ def initial_feedforward_weights(n_basis=8, n_u = 2):
     # initialize feedforward weights to zero
     # initially there is no learned feedforward command and the system relies entirely on feedback control to achieve the target state.
     return np.zeros((n_basis, n_u)) 
+
+
+@dataclass
+class Perturbation:
+    kind: str = None # None, mossy, inta_rn, inta_general
+    onset_idx: int = 45 # start of perturbation in time steps, relative to reach onset
+    duration: int = 5 # duration of perturbation in time steps
+    pulse: np.array = None # shape (2,) for motor output pulse
+    observer_bias: np.ndarray = None # shape (4,) for mossy perturbation bias on state observation
+
+    def __post_init__(self):
+        if self.pulse is None:
+            #default decelerative pulse
+            self.pulse = np.array([-2.0, -1.0], dtype=float)
+
+        if self.observer_bias is None:
+            #default bias for mossy perturbation: overestimate outward position, underestimate upward position, and underestimate velocities
+            self.observer_bias = np.array([0.0, 0.0, 0.8, 0.4], dtype=float)
