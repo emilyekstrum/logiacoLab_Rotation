@@ -32,6 +32,8 @@ import numpy as np
 from dataclasses import dataclass
 from scipy.linalg import solve_discrete_are
 
+Array = np.ndarray
+
 # Define LQG parameters and model
 @dataclass
 class LQGParams:
@@ -59,6 +61,10 @@ class LQGParams:
         if self.target is None:
             #reach target at outward 1.0, upward 0.5, with zero termninal velocity
             self.target = np.array([1.0, 0.5, 0.0, 0.0], dtype=float)
+        else:
+            self.target = np.asarray(self.target, dtype=float)
+            if self.target.shape != (4,):
+                raise ValueError("Target state must be a 4-dimensional vector [p_out, p_up, v_out, v_up]")
 
 
 # Define linear kinematic system dynamics
