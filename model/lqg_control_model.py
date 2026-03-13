@@ -199,6 +199,7 @@ def initial_feedforward_weights(n_basis=8, n_u = 2):
     # initially there is no learned feedforward command and the system relies entirely on feedback control to achieve the target state.
     return np.zeros((n_basis, n_u), dtype=float) 
 
+@dataclass
 class LQGController:
     """ LQG Controller class encapsulating the parameters and methods for simulating reaches with cerebellar adaptation. """
 
