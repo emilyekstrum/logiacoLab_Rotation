@@ -202,12 +202,14 @@ class LQGController:
     """ LQG Controller class encapsulating the parameters and methods for simulating reaches with cerebellar adaptation. """
 
     def __init__ (self, params: LQGParams):
-        self.params = params
+        self.params = params if params is not None else LQGParams()
+
         self.A, self.B, self.C = build_state_space(params)
         self.Q, self.R = build_cost_matrices()
         self.W, self.V = build_noise_matrices(params)
-        self.K, _ = dlqr(self.A, self.B, self.Q, self.R)
-        self.L, _ = dlqe(self.A, self.C, self.W, self.V)
+
+        self.K, self.P_lqr = dlqr(self.A, self.B, self.Q, self.R)
+        self.L, self.P_kf = dlqe(self.A, self.C, self.W, self.V)
 
 
     # simulate a reach with LQG control and cerebellar adaptation
