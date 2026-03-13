@@ -209,6 +209,133 @@ def initial_feedforward_weights(n_basis=8, n_u = 2):
     # initially there is no learned feedforward command and the system relies entirely on feedback control to achieve the target state.
     return np.zeros((n_basis, n_u), dtype=float) 
 
+def update_feedforward_weights(
+    ff_weights: Array,
+    Phi: Array,
+    ytilde: Array,
+    B: Array,
+    params: LQGParams) -> Array:
+    """Update feedforward weights based on prediction errors using cerebellar-like learning.
+    
+    Learning rule: weights are adjusted to minimize future prediction errors by learning
+    a feedforward command that compensates for predictable perturbations.
+    
+    Returns:
+        Updated feedforward weights [n_basis, n_u]
+    """
+    
+    # get velocity components of prediction error (indices 2-3)
+    # use velocity errors as they reflect motor command errors most directly
+    velocity_errors = ytilde[:, 2:4]  # [T, 2]
+    
+    # compute weight update: learn to produce motor commands that would have
+    # reduced the velocity prediction errors we observed
+    # delta_w = -eta * Phi.T @ velocity_errors
+    # The negative sign means we learn to counteract the errors
+    delta_w = -params.eta * (Phi.T @ velocity_errors)  # [n_basis, 2]
+    
+    # apply weight decay (forgetting) and add new learning
+    ff_weights_new = params.ff_decay * ff_weights + delta_w
+    
+    return ff_weights_new
+
+def train_with_adaptation(
+    controller: 'LQGController',
+    Phi: Array,
+    n_trials: int = 100,
+    perturbation: Optional[Perturbation] = None,
+    perturbation_trials: Optional[tuple] = None,
+    rng: Optional[np.random.Generator] = None) -> dict:
+    """
+    Train the controller over multiple trials with cerebellar adaptation.
+    
+    Args:
+        controller: LQGController instance
+        Phi: Temporal basis functions
+        n_trials: Number of training trials
+        perturbation: Perturbation to apply (if None, no perturbation)
+        perturbation_trials: Tuple (start, end) indicating which trials have perturbation.
+                           If None, perturbation applied to all trials (if perturbation is not None)
+        rng: Random number generator
+    
+    Returns:
+        Dictionary containing training history:
+            - 'ff_weights_history': Weight evolution [n_trials+1, n_basis, n_u]
+            - 'cost_history': Cost per trial [n_trials]
+            - 'endpoint_error_history': Endpoint error per trial [n_trials]
+            - 'trials': List of trial results for selected trials
+    """
+    
+    if rng is None:
+        rng = np.random.default_rng()
+    
+    # Initialize weights
+    ff_weights = controller.make_default_ff_weights(n_basis=Phi.shape[1])
+    
+    # Storage for history
+    n_basis = Phi.shape[1]
+    ff_weights_history = np.zeros((n_trials + 1, n_basis, 2))
+    ff_weights_history[0] = ff_weights.copy()
+    
+    cost_history = np.zeros(n_trials)
+    endpoint_error_history = np.zeros(n_trials)
+    
+    # Store full trial data for selected trials
+    save_trial_indices = [0, n_trials//4, n_trials//2, 3*n_trials//4, n_trials-1]
+    trials_data = {}
+    
+    # Determine perturbation schedule
+    if perturbation_trials is None and perturbation is not None:
+        # Apply perturbation to all trials
+        pert_start, pert_end = 0, n_trials
+    elif perturbation_trials is not None:
+        pert_start, pert_end = perturbation_trials
+    else:
+        pert_start, pert_end = 0, 0  # No perturbation
+    
+    for trial in range(n_trials):
+        # Determine if this trial has perturbation
+        if perturbation is not None and pert_start <= trial < pert_end:
+            trial_pert = perturbation
+        else:
+            trial_pert = None
+        
+        # Simulate reach
+        result = controller.simulate_reach(
+            Phi=Phi,
+            ff_weights=ff_weights,
+            perturbation=trial_pert,
+            rng=rng
+        )
+        
+        # Record metrics
+        cost_history[trial] = result['J']
+        endpoint_error = np.linalg.norm(result['x'][-1, :2] - controller.params.target[:2])
+        endpoint_error_history[trial] = endpoint_error
+        
+        # Save full trial data for selected trials
+        if trial in save_trial_indices:
+            trials_data[trial] = result
+        
+        # Update weights based on prediction errors
+        ff_weights = update_feedforward_weights(
+            ff_weights=ff_weights,
+            Phi=Phi,
+            ytilde=result['ytilde'],
+            B=controller.B,
+            params=controller.params
+        )
+        
+        ff_weights_history[trial + 1] = ff_weights.copy()
+    
+    return {
+        'ff_weights_history': ff_weights_history,
+        'cost_history': cost_history,
+        'endpoint_error_history': endpoint_error_history,
+        'trials': trials_data,
+        'final_ff_weights': ff_weights
+    }
+
 @dataclass
 class LQGController:
     """ LQG Controller class encapsulating the parameters and methods for simulating reaches with cerebellar adaptation. """
@@ -340,8 +467,8 @@ def simulate_reach(
             # process noise
             proc_noise = rng.multivariate_normal(np.zeros(4), W) # sample process noise for current time step
 
-            # plant update
-            x[t] = A @ x[t-1] + B @ u_app[t] + proc_noise # update true state based on previous state, applied control input, and process noise
+            # plant update - use u_app[t-1] not u_app[t] to maintain causality
+            x[t] = A @ x[t-1] + B @ u_app[t-1] + proc_noise # update true state based on previous state, applied control input, and process noise
 
 
         # trial cost
@@ -375,4 +502,6 @@ __all__ = [
     "make_time_basis",
     "initial_feedforward_weights",
     "simulate_reach",
+    "update_feedforward_weights",
+    "train_with_adaptation",
 ]
