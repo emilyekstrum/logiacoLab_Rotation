@@ -31,6 +31,7 @@ theta: adaptation weights representing the learning parameters for updating the 
 import numpy as np
 from dataclasses import dataclass
 from scipy.linalg import solve_discrete_are
+from typing import Optional
 
 Array = np.ndarray
 
@@ -214,14 +215,53 @@ class LQGController:
 
     # simulate a reach with LQG control and cerebellar adaptation
     def simulate_reach(
-            params: LQGParams,
-            K, L, Q, R, W, V, 
-            Phi, ff_weights,
-            perturbation: Perturbation = None,
-            x0=None,
-            rng=None):
+        self,
+        Phi: Array,
+        ff_weights: Array,
+        perturbation: Optional[Perturbation] = None,
+        x0: Optional[Array] = None,
+        rng: Optional[np.random.Generator] = None,):
         
-        """ Simulates a single reach using the LQG control model with cerebellar adaptation. """
+        """ Instance wrapper around simulate_reach """
+
+        return simulate_reach(
+        params=self.params,
+        K=self.K,
+        L=self.L,
+        Q=self.Q,
+        R=self.R,
+        W=self.W,
+        V=self.V,
+        Phi=Phi,
+        ff_weights=ff_weights,
+        perturbation=perturbation,
+        x0=x0,
+        rng=rng,
+        )
+    
+    def make_default_basis(self, n_basis: int = 8, width: float = 10.0) -> Array:
+        """Convenience helper to create default temporal basis functions."""
+        return make_time_basis(self.params.T, n_basis=n_basis, width=width)
+
+    def make_default_ff_weights(self, n_basis: int = 8) -> Array:
+        """Convenience helper to create zero-initialized feedforward weights."""
+        return initial_feedforward_weights(n_basis=n_basis, n_u=2)
+
+
+def simulate_reach(
+    params: LQGParams,
+    K: Array,
+    L: Array,
+    Q: Array,
+    R: Array,
+    W: Array,
+    V: Array,
+    Phi: Array,
+    ff_weights: Array,
+    perturbation: Optional[Perturbation] = None,
+    x0: Optional[Array] = None,
+    rng: Optional[np.random.Generator] = None): 
+        """ simulates a reach trajectory under LQG control with cerebellar adaptation and optional perturbations. Returns the state trajectory, control inputs, and cost for the trial. """
 
         if rng is None: 
             rng = np.random.default_rng()
@@ -296,15 +336,15 @@ class LQGController:
             state_error = x[t] - target
             J += state_error.T @ Q @ state_error + u_app[t].T @ R @ u_app[t] # accumulate cost based on state error and control effort
 
-    return {
-        'x': x, # true state trajectory
-        'xhat' : xhat, # estimated state trajectory from internal model
-        'xhat_pred' : xhat_pred, # predicted state trajectory from internal model before observing current state
-        'y': y, # observed state trajectory with measurement noise
-        'yhat': yhat, # predicted observations from internal model
-        'ytilde': ytilde, # observation prediction error trajectory
-        'u_nom': u_nom, # nominal control input trajectory from feedback controller
-        'u_app': u_app, # applied control input trajectory including feedforward command and perturbations
-        'u_ff': u_ff, # feedforward control command trajectory from cerebellar adaptation
-        'J': J # total cost for the trial
-    }
+        return {
+            'x': x, # true state trajectory
+            'xhat' : xhat, # estimated state trajectory from internal model
+            'xhat_pred' : xhat_pred, # predicted state trajectory from internal model before observing current state
+            'y': y, # observed state trajectory with measurement noise
+            'yhat': yhat, # predicted observations from internal model
+            'ytilde': ytilde, # observation prediction error trajectory
+            'u_nom': u_nom, # nominal control input trajectory from feedback controller
+            'u_app': u_app, # applied control input trajectory including feedforward command and perturbations
+            'u_ff': u_ff, # feedforward control command trajectory from cerebellar adaptation
+            'J': J # total cost for the trial
+        }
