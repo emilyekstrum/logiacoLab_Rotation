@@ -26,3 +26,28 @@ baseline = LQGController.simulate_reach(
     perturbation=None,
     rng=np.random.default_rng(0)
 )
+
+# simulate a reach without perturbation
+LQGController.plot_reach(baseline, title="Baseline LQG Control Reach")
+
+
+# simulate a reach with a mossy fiber perturbation
+mossy_pert = LQGController.Perturbation(
+    kind='mossy',
+    onset_idx=45,
+    duration=5,
+    observer_bias=np.array([0.0, 0.0, 0.9, 0.5])
+)
+
+res_mossy = LQGController.simulate_reach(
+    params=params,
+    K=K, L=L,
+    Q=Q, R=R,
+    W=W, V=V,
+    ff_weights=ff_weights,
+    Phi=Phi,
+    perturbation=mossy_pert,
+    rng=np.random.default_rng(3)
+)
+
+LQGController.plot_reach(res_mossy, title="Mossy fiber perturbation")
