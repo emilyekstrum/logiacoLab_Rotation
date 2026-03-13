@@ -113,3 +113,19 @@ def build_cost_matrices():
     R = np.diag([0.3, 0.3]) # weights for [u_out, u_up]
 
     return Q, R
+
+def dlqe(A, C, W, V):
+    """ Solves the discrete-time Linear Quadratic Estimator (LQE) problem. """
+
+    # solve estimator riccati equation for dual system
+    P = solve_discrete_are(A.T, C.T, W, V) # solve the discrete-time algebraic Riccati equation to find the optimal estimation error covariance matrix P
+    L = P @ C.T @ np.linalg.inv(C @ P @ C.T + V) # compute the optimal Kalman gain L using the solution P
+    return L, P
+
+def build_noise_matrices(params: LQGParams):
+    """ Constructs the process and measurement noise covariance matrices. """
+
+    W = params.W_scale * np.diag([1.0, 1.0, 2.0, 2.0]) # process noise is higher for velocity components, reflecting greater variability in movement execution compared to position, which is more directly influenced by control inputs and sensory feedback
+    V = params.V_scale * np.diag([1.0, 1.0, 1.0, 1.0]) # measurement noise is smaller than process noise, reflecting that sensory feedback is relatively reliable compared to the inherent variability in movement execution
+
+    return W, V
