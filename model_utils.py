@@ -51,6 +51,13 @@ def plot_reach(result, params, perturbation=None, title="Reach"):
 
     if perturbation is not None:
         axes[1].axvspan(stim_start, stim_end, color="#4A90E2", alpha=0.25)
+        axes[1].text(
+            (stim_end)/2,
+            axes[1].get_ylim()[1]*0.9,
+            "Stim",
+            ha="left",
+            color="#4A90E2"
+        )
         axes[1].axvline(0, color="red", linestyle="--", linewidth=1)
 
     axes[1].axhline(0, color="gray", linestyle="--", linewidth=1)
@@ -64,6 +71,13 @@ def plot_reach(result, params, perturbation=None, title="Reach"):
 
     if perturbation is not None:
         axes[2].axvspan(stim_start, stim_end, color="#4A90E2", alpha=0.25)
+        axes[1].text(
+            (stim_end)/2,
+            axes[1].get_ylim()[1]*0.9,
+            "Stim",
+            ha="left",
+            color="#4A90E2"
+        )
         axes[2].axvline(0, color="red", linestyle="--", linewidth=1)
 
     axes[2].axhline(0, color="gray", linestyle="--", linewidth=1)
