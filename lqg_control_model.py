@@ -36,6 +36,8 @@ from scipy.linalg import solve_discrete_are
 # Define LQG parameters and model
 @dataclass
 class LQGParams:
+    """ Parameters for the LQG control model. """
+    
     dt: float = 0.01 # 10 ms time bins
     drag: float = 0.92 #velocity retention
     control_gain: float = 0.1 # command -> acceleration gain
@@ -62,11 +64,14 @@ class LQGParams:
 
 # Define linear kinematic system dynamics
 def build_state_space(params: LQGParams):
+    """ Constructs the state-space representation of the system dynamics based on parameters. """
+
     dt = params.dt
     drag = params.drag
     b = params.control_gain
 
     # x = [p_out, p_up, v_out, v_up]
+    # control passive limb evolution with drag, and active control input with gain b
     A = np.array([
         [1, 0, dt, 0],
         [0, 1, 0, dt],
@@ -74,6 +79,7 @@ def build_state_space(params: LQGParams):
         [0, 0, 0, drag]
     ])
 
+    # maps motor commands to changes in velocity, which then affect position through A
     B = np.array([
         [0, 0],
         [0, 0],
@@ -82,6 +88,28 @@ def build_state_space(params: LQGParams):
     ])
     
     # observe all satate variables initially
+    # defines what the cerebellum receives as input for state estimation and learning
     C = np.eye(4)
 
     return A, B, C
+
+
+def dlqr(A, B, Q, R):
+    """ Solves the discrete-time Linear Quadratic Regulator (LQR) problem. """
+
+    P = solve_discrete_are(A, B, Q, R) # solve the discrete-time algebraic Riccati equation to find the optimal cost-to-go matrix P
+    K = np.linalg.inv(B.T @ P @ B + R) @ (B.T @ P @ A) # compute the optimal state feedback gain K using the solution P
+    return K, P 
+
+def build_cost_matrices():
+    """ Constructs the state and control cost matrices for the LQG problem. """
+
+    # state cost: penalize deviation from target state, with higher weight on position errors
+    # penalize position error stronlgy, velocity error less so, to encourage accurate reaching while allowing for some variability in movement speed
+    Q = np.diag([120.0, 120.0, 8.0, 8.0]) # weights for [p_out, p_up, v_out, v_up]
+
+    # control cost: penalize large control inputs to encourage efficient movements
+    # penalize control inputs more strongly to encourage the system to find efficient motor commands that achieve the target state with minimal effort, while still allowing for necessary adjustments to reach the target accurately
+    R = np.diag([0.3, 0.3]) # weights for [u_out, u_up]
+
+    return Q, R
