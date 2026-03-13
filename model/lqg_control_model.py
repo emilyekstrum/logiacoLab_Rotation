@@ -198,90 +198,101 @@ def initial_feedforward_weights(n_basis=8, n_u = 2):
     # initially there is no learned feedforward command and the system relies entirely on feedback control to achieve the target state.
     return np.zeros((n_basis, n_u), dtype=float) 
 
+class LQGController:
+    """ LQG Controller class encapsulating the parameters and methods for simulating reaches with cerebellar adaptation. """
 
-# simulate a reach with LQG control and cerebellar adaptation
-def simulate_reach(
-        params: LQGParams,
-        K, L, Q, R, W, V, 
-        Phi, ff_weights,
-        perturbation: Perturbation = None,
-        x0=None,
-        rng=None):
-    
-    """ Simulates a single reach using the LQG control model with cerebellar adaptation. """
-
-    if rng is None: 
-        rng = np.random.default_rng()
-    if x0 is None:
-        x0 = np.zeros(4) # start at rest with paw at origin
-
-    A, B, C = build_state_space(params)
-    T = params.T
-
-    x = np.zeros((t, 4)) # state trajectory
-    xhat_pred = zp.zeros((T, 4)) # predicted state trajectory from internal model before observing current state
-    xhat = np.zeros((T, 4)) # estimated state trajectory from internal model
-    y = np.zeros((T, 4)) # observed state trajectory with measurement noise
-    yhat = np.zeros((T, 4)) # predicted observations from internal model
-    ytilde = np.zeros((T, 4)) # observation prediction error trajectory
-    u_nom = np.zeros((T, 2)) # nominal control input trajectory from feedback controller
-    u_app = np.zeros((T, 2)) # applied control input trajectory including feedforward command and perturbations
-    u_ff = Phi @ ff_weights # feedforward control command trajectory from cerebellar adaptation
-
-    x[0] = x0 # initialize true state trajectory with initial state
-    xhat[0] = x0 # initialize state estimate to true initial state
-    y[0] = C @ x[0] + rng.multivariate_normal(np.zeros(4), V) # initial observation with measurement noise
-    yhat[0] = C @ xhat[0] # initial predicted observation from internal model
-    ytilde[0] = y[0] - yhat[0] # initial observation prediction error
-
-    target = params.target
-
-    for t in range(1, T):
-        # prediction step
-        xhat_pred[t] = A @ xhat[t-1] + B @ u_app[t-1] # predict next state based on previous state estimate and applied control input
-
-        # mossy fiber perturbation enters observer/internal model
-        if perturbation is not None and perturbation.kind == "mossy":
-            if perturbation.oneset_idx <= t < perturbation.onset_idx + perturbation.duration:
-                xhat_pred[t] += perturbation.observer_bias # add bias to predicted state to simulate altered sensory input from mossy fiber perturbation
-
-        # predicted observation
-        yhat[t] = C @ xhat_pred[t] 
-
-        # real observation
-        obs_noise = rng.multivariate_normal(np.zeros(4), V) # sample measurement noise for current time step
-        y[t] = C @ x[t] + obs_noise # true observation with measurement noise
-
-        # prediction error
-        ytilde[t] = y[t] - yhat[t] # compute observation prediction
-
-        #control around target state
-        state_error = xhat[t] - target # compute error between current state estimate and target state
-        u_nom[t] = -K @ state_error + u_ff[t] # compute nominal control input from feedback controller
-
-        # applied control perturbed at output
-        u_app[t] = u_nom[t].copy()
-
-        if perturbation is not None and perturbation.kind in ['inta_rn', 'inta_general']:
-            if perturbation.onset_idx <= t < perturbation.onset_idx + perturbation.duration:
-                u_app[t] += perturbation.pulse # add perturbation pulse to control input to simulate intra-cerebellar or general motor output perturbation
-
-            if perturbation.kind == 'inta_general':
-                # make less selective
-                u_app[t] += rng.normal(0, 0.5, size=2) # add some random noise to the control input to simulate a more general perturbation that affects multiple aspects of motor output
-
-        # process noise
-        proc_noise = rng.multivariate_normal(np.zeros(4), W) # sample process noise for current time step
-
-        # plant update
-        x[t] = A @ x[t-1] + B @ u_app[t] + proc_noise # update true state based on previous state, applied control input, and process noise
+    def __init__ (self, params: LQGParams):
+        self.params = params
+        self.A, self.B, self.C = build_state_space(params)
+        self.Q, self.R = build_cost_matrices()
+        self.W, self.V = build_noise_matrices(params)
+        self.K, _ = dlqr(self.A, self.B, self.Q, self.R)
+        self.L, _ = dlqe(self.A, self.C, self.W, self.V)
 
 
-    # trial cost
-    J = 0.0
-    for t in range(T):
-        state_error = x[t] - target
-        J += state_error.T @ Q @ state_error + u_app[t].T @ R @ u_app[t] # accumulate cost based on state error and control effort
+    # simulate a reach with LQG control and cerebellar adaptation
+    def simulate_reach(
+            params: LQGParams,
+            K, L, Q, R, W, V, 
+            Phi, ff_weights,
+            perturbation: Perturbation = None,
+            x0=None,
+            rng=None):
+        
+        """ Simulates a single reach using the LQG control model with cerebellar adaptation. """
+
+        if rng is None: 
+            rng = np.random.default_rng()
+        if x0 is None:
+            x0 = np.zeros(4) # start at rest with paw at origin
+
+        A, B, C = build_state_space(params)
+        T = params.T
+
+        x = np.zeros((t, 4)) # state trajectory
+        xhat_pred = zp.zeros((T, 4)) # predicted state trajectory from internal model before observing current state
+        xhat = np.zeros((T, 4)) # estimated state trajectory from internal model
+        y = np.zeros((T, 4)) # observed state trajectory with measurement noise
+        yhat = np.zeros((T, 4)) # predicted observations from internal model
+        ytilde = np.zeros((T, 4)) # observation prediction error trajectory
+        u_nom = np.zeros((T, 2)) # nominal control input trajectory from feedback controller
+        u_app = np.zeros((T, 2)) # applied control input trajectory including feedforward command and perturbations
+        u_ff = Phi @ ff_weights # feedforward control command trajectory from cerebellar adaptation
+
+        x[0] = x0 # initialize true state trajectory with initial state
+        xhat[0] = x0 # initialize state estimate to true initial state
+        y[0] = C @ x[0] + rng.multivariate_normal(np.zeros(4), V) # initial observation with measurement noise
+        yhat[0] = C @ xhat[0] # initial predicted observation from internal model
+        ytilde[0] = y[0] - yhat[0] # initial observation prediction error
+
+        target = params.target
+
+        for t in range(1, T):
+            # prediction step
+            xhat_pred[t] = A @ xhat[t-1] + B @ u_app[t-1] # predict next state based on previous state estimate and applied control input
+
+            # mossy fiber perturbation enters observer/internal model
+            if perturbation is not None and perturbation.kind == "mossy":
+                if perturbation.oneset_idx <= t < perturbation.onset_idx + perturbation.duration:
+                    xhat_pred[t] += perturbation.observer_bias # add bias to predicted state to simulate altered sensory input from mossy fiber perturbation
+
+            # predicted observation
+            yhat[t] = C @ xhat_pred[t] 
+
+            # real observation
+            obs_noise = rng.multivariate_normal(np.zeros(4), V) # sample measurement noise for current time step
+            y[t] = C @ x[t] + obs_noise # true observation with measurement noise
+
+            # prediction error
+            ytilde[t] = y[t] - yhat[t] # compute observation prediction
+
+            #control around target state
+            state_error = xhat[t] - target # compute error between current state estimate and target state
+            u_nom[t] = -K @ state_error + u_ff[t] # compute nominal control input from feedback controller
+
+            # applied control perturbed at output
+            u_app[t] = u_nom[t].copy()
+
+            if perturbation is not None and perturbation.kind in ['inta_rn', 'inta_general']:
+                if perturbation.onset_idx <= t < perturbation.onset_idx + perturbation.duration:
+                    u_app[t] += perturbation.pulse # add perturbation pulse to control input to simulate intra-cerebellar or general motor output perturbation
+
+                if perturbation.kind == 'inta_general':
+                    # make less selective
+                    u_app[t] += rng.normal(0, 0.5, size=2) # add some random noise to the control input to simulate a more general perturbation that affects multiple aspects of motor output
+
+            # process noise
+            proc_noise = rng.multivariate_normal(np.zeros(4), W) # sample process noise for current time step
+
+            # plant update
+            x[t] = A @ x[t-1] + B @ u_app[t] + proc_noise # update true state based on previous state, applied control input, and process noise
+
+
+        # trial cost
+        J = 0.0
+        for t in range(T):
+            state_error = x[t] - target
+            J += state_error.T @ Q @ state_error + u_app[t].T @ R @ u_app[t] # accumulate cost based on state error and control effort
 
     return {
         'x': x, # true state trajectory
