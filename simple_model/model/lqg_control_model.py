@@ -1,4 +1,4 @@
-""" Linear Quadratic Gaussian (LQG) Control Model for cerebellar pathways.
+""" Linear Quadratic Gaussian (LQG) Control Model for cerebellar pathways using general kinematics.
 
 State:
 - x(t) : State vector representing the system's current state at time t.
