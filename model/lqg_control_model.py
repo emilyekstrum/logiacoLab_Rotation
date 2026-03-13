@@ -272,8 +272,8 @@ def simulate_reach(
         A, B, C = build_state_space(params)
         T = params.T
 
-        x = np.zeros((t, 4)) # state trajectory
-        xhat_pred = zp.zeros((T, 4)) # predicted state trajectory from internal model before observing current state
+        x = np.zeros((T, 4)) # state trajectory
+        xhat_pred = np.zeros((T, 4)) # predicted state trajectory from internal model before observing current state
         xhat = np.zeros((T, 4)) # estimated state trajectory from internal model
         y = np.zeros((T, 4)) # observed state trajectory with measurement noise
         yhat = np.zeros((T, 4)) # predicted observations from internal model
@@ -296,7 +296,7 @@ def simulate_reach(
 
             # mossy fiber perturbation enters observer/internal model
             if perturbation is not None and perturbation.kind == "mossy":
-                if perturbation.oneset_idx <= t < perturbation.onset_idx + perturbation.duration:
+                if perturbation.onset_idx <= t < perturbation.onset_idx + perturbation.duration:
                     xhat_pred[t] += perturbation.observer_bias # add bias to predicted state to simulate altered sensory input from mossy fiber perturbation
 
             # predicted observation
