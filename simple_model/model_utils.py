@@ -118,6 +118,89 @@ def plot_reach(result, params, perturbation=None, title="Reach"):
     plt.show()
 
 
+def plot_reach_zoomed(result, params, perturbation, title="Reach (Zoomed)"):
+    """Plot zoomed-in view of reach trajectory during perturbation window.
+    Shows position and velocity changes around the perturbation."""
+    
+    if perturbation is None:
+        print("Warning: plot_reach_zoomed requires a perturbation to zoom around")
+        return
+    
+    x = result["x"]
+    T = len(x)
+    
+    # zoom window: 200ms before to 300ms after perturbation onset
+    zoom_before = 20  # 200ms before
+    zoom_after = 30   # 300ms after
+    t_start = max(0, perturbation.onset_idx - zoom_before)
+    t_end = min(T, perturbation.onset_idx + perturbation.duration + zoom_after)
+    
+    # time axis aligned to perturbation onset
+    t = (np.arange(t_start, t_end) - perturbation.onset_idx) * params.dt
+    stim_start = 0
+    stim_end = perturbation.duration * params.dt
+    
+    # get zoomed data
+    x_zoom = x[t_start:t_end]
+    
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    
+    # position trajectory (zoomed)
+    axes[0, 0].plot(x_zoom[:, 0], x_zoom[:, 1], color="black", linewidth=2)
+    axes[0, 0].scatter([x_zoom[0, 0]], [x_zoom[0, 1]], color="green", s=100, label="Window start", zorder=5)
+    
+    # mark perturbation onset and end on trajectory
+    pert_start_idx = perturbation.onset_idx - t_start if perturbation.onset_idx >= t_start else 0
+    pert_end_idx = min(perturbation.onset_idx + perturbation.duration - t_start, len(x_zoom) - 1)
+    axes[0, 0].scatter([x_zoom[pert_start_idx, 0]], [x_zoom[pert_start_idx, 1]], 
+                      color="red", s=100, label="Stim onset", zorder=5, marker='s')
+    axes[0, 0].scatter([x_zoom[pert_end_idx, 0]], [x_zoom[pert_end_idx, 1]], 
+                      color="blue", s=100, label="Stim end", zorder=5, marker='^')
+    
+    axes[0, 0].set_xlabel("Outward position")
+    axes[0, 0].set_ylabel("Upward position")
+    axes[0, 0].set_title(f"{title}: Trajectory (zoomed)")
+    axes[0, 0].legend()
+    axes[0, 0].grid(True, alpha=0.3)
+    
+    # outward position over time
+    axes[0, 1].plot(t, x_zoom[:, 0], color="black", linewidth=2)
+    axes[0, 1].axvspan(stim_start, stim_end, color="#4A90E2", alpha=0.25, label="Perturbation")
+    axes[0, 1].axvline(0, color="red", linestyle="--", linewidth=1, alpha=0.7)
+    axes[0, 1].set_xlabel("Time from stimulus (s)")
+    axes[0, 1].set_ylabel("Outward position")
+    axes[0, 1].set_title(f"{title}: Outward position")
+    axes[0, 1].grid(True, alpha=0.3)
+    axes[0, 1].legend()
+    
+    # upward position over time
+    axes[1, 0].plot(t, x_zoom[:, 1], color="black", linewidth=2)
+    axes[1, 0].axvspan(stim_start, stim_end, color="#4A90E2", alpha=0.25, label="Perturbation")
+    axes[1, 0].axvline(0, color="red", linestyle="--", linewidth=1, alpha=0.7)
+    axes[1, 0].set_xlabel("Time from stimulus (s)")
+    axes[1, 0].set_ylabel("Upward position")
+    axes[1, 0].set_title(f"{title}: Upward position")
+    axes[1, 0].grid(True, alpha=0.3)
+    axes[1, 0].legend()
+    
+    # velocity magnitude over time
+    v_mag = np.sqrt(x_zoom[:, 2]**2 + x_zoom[:, 3]**2)
+    axes[1, 1].plot(t, v_mag, color="purple", linewidth=2, label="Velocity magnitude")
+    axes[1, 1].plot(t, x_zoom[:, 2], color="blue", linewidth=1.5, alpha=0.7, label="Outward velocity")
+    axes[1, 1].plot(t, x_zoom[:, 3], color="green", linewidth=1.5, alpha=0.7, label="Upward velocity")
+    axes[1, 1].axvspan(stim_start, stim_end, color="#4A90E2", alpha=0.25)
+    axes[1, 1].axvline(0, color="red", linestyle="--", linewidth=1, alpha=0.7)
+    axes[1, 1].axhline(0, color="gray", linestyle="--", linewidth=0.8, alpha=0.5)
+    axes[1, 1].set_xlabel("Time from stimulus (s)")
+    axes[1, 1].set_ylabel("Velocity")
+    axes[1, 1].set_title(f"{title}: Velocity components")
+    axes[1, 1].grid(True, alpha=0.3)
+    axes[1, 1].legend()
+    
+    plt.tight_layout()
+    plt.show()
+
+
 def compute_behavior_metrics(result, target):
     x = result["x"]
     ytilde = result["ytilde"]
