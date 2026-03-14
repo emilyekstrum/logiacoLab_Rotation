@@ -440,15 +440,28 @@ def simulate_reach(
         u_app[0] = u_nom[0].copy()
 
         for t in range(1, T):
-            # Plant update FIRST - uses control from previous timestep
+            # Apply motor output perturbations to the control that will affect THIS timestep
+            # This ensures perturbation affects x[t] exactly when onset_idx <= t < onset_idx + duration
+            u_to_apply = u_app[t-1].copy()
+            
+            if perturbation is not None and perturbation.kind in ['inta_rn', 'inta_general']:
+                if perturbation.onset_idx <= t < perturbation.onset_idx + perturbation.duration:
+                    u_to_apply += perturbation.pulse
+                    
+                    # Add noise only during perturbation window for inta_general
+                    if perturbation.kind == 'inta_general':
+                        u_to_apply += rng.normal(0, perturbation.general_noise_std, size=2)
+            
+            # Plant update - uses the potentially perturbed control
             proc_noise = rng.multivariate_normal(np.zeros(4), W)
-            x[t] = A @ x[t-1] + B @ u_app[t-1] + proc_noise
+            x[t] = A @ x[t-1] + B @ u_to_apply + proc_noise
 
             # Observation of current state
             obs_noise = rng.multivariate_normal(np.zeros(4), V)
             y[t] = C @ x[t] + obs_noise
 
             # Estimator prediction (what we expected to see)
+            # Uses the UNPERTURBED control from internal model's perspective
             xhat_pred[t] = A @ xhat[t-1] + B @ u_app[t-1]
 
             # Mossy fiber perturbation enters observer/internal model
@@ -468,17 +481,7 @@ def simulate_reach(
             # Compute control for NEXT timestep based on current estimate
             state_error = xhat[t] - target
             u_nom[t] = -K @ state_error + u_ff[t]
-
-            # Applied control perturbed at output
             u_app[t] = u_nom[t].copy()
-
-            if perturbation is not None and perturbation.kind in ['inta_rn', 'inta_general']:
-                if perturbation.onset_idx <= t < perturbation.onset_idx + perturbation.duration:
-                    u_app[t] += perturbation.pulse
-                    
-                    # Add noise only during perturbation window for inta_general
-                    if perturbation.kind == 'inta_general':
-                        u_app[t] += rng.normal(0, perturbation.general_noise_std, size=2)
 
 
         # trial cost
