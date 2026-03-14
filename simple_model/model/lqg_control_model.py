@@ -475,9 +475,10 @@ def simulate_reach(
             if perturbation is not None and perturbation.kind in ['inta_rn', 'inta_general']:
                 if perturbation.onset_idx <= t < perturbation.onset_idx + perturbation.duration:
                     u_app[t] += perturbation.pulse
-
-                if perturbation.kind == 'inta_general':
-                    u_app[t] += rng.normal(0, 0.5, size=2)
+                    
+                    # Add noise only during perturbation window for inta_general
+                    if perturbation.kind == 'inta_general':
+                        u_app[t] += rng.normal(0, perturbation.general_noise_std, size=2)
 
 
         # trial cost
