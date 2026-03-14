@@ -173,7 +173,8 @@ def build_cost_matrices():
     Q = np.diag([120.0, 120.0, 8.0, 8.0]) # weights for [p_out, p_up, v_out, v_up]
 
     # control cost: penalize large control inputs to encourage efficient movements
-    # penalize control inputs more strongly to encourage the system to find efficient motor commands that achieve the target state with minimal effort, while still allowing for necessary adjustments to reach the target accurately
+    # penalize control inputs more strongly to encourage the system to find efficient motor commands that achieve the target state with minimal effort, 
+    # while still allowing for necessary adjustments to reach the target accurately
     R = np.diag([0.3, 0.3]) # weights for [u_out, u_up]
 
     return Q, R
@@ -189,8 +190,13 @@ def dlqe(A, C, W, V):
 def build_noise_matrices(params: LQGParams):
     """ Constructs the process and measurement noise covariance matrices. """
 
-    W = params.W_scale * np.diag([1.0, 1.0, 2.0, 2.0]) # process noise is higher for velocity components, reflecting greater variability in movement execution compared to position, which is more directly influenced by control inputs and sensory feedback
-    V = params.V_scale * np.diag([1.0, 1.0, 1.0, 1.0]) # measurement noise is smaller than process noise, reflecting that sensory feedback is relatively reliable compared to the inherent variability in movement execution
+    # process noise is higher for velocity components, reflecting greater variability in movement execution compared to position, 
+    # which is more directly influenced by control inputs and sensory feedback
+    W = params.W_scale * np.diag([1.0, 1.0, 2.0, 2.0]) 
+
+    # measurement noise is smaller than process noise, reflecting that sensory feedback is relatively reliable 
+    # compared to the inherent variability in movement execution
+    V = params.V_scale * np.diag([1.0, 1.0, 1.0, 1.0]) 
 
     return W, V
 
@@ -203,10 +209,18 @@ def make_time_basis(T, n_basis=8, width=10):
     if width <= 0:
         raise ValueError("width must be positive.")
 
-    centers = np.linspace(10, max(10, T - 20), n_basis) # centers start at 10 to avoid being too close to reach onset, and end at least 20 time steps before reach end to allow for learning effects to influence the reach trajectory
+    # centers start at 10 to avoid being too close to reach onset, and end at least 20 time steps before reach end to 
+    # allow for learning effects to influence the reach trajectory
+    centers = np.linspace(10, max(10, T - 20), n_basis) 
     t = np.arange(T)[:, None] # time vector of shape [T, 1] for broadcasting with centers of shape [n_basis]
-    Phi = np.exp(-0.5 * ((t - centers[None, :]) / width) ** 2) # compute Gaussian basis functions for each time step and basis function center, resulting in a [T, n_basis] matrix where each column is a Gaussian function centered at a different time point in the reach
-    Phi /= np.maximum(Phi.max(axis=0, keepdims=True), 1e-12) # normalize each basis function to have a maximum value of 1, preventing numerical issues with very small values and ensuring that the feedforward command can scale appropriately based on the learned weights without being dominated by the shape of the basis functions
+
+    # compute Gaussian basis functions for each time step and basis function center, 
+    # resulting in a [T, n_basis] matrix where each column is a Gaussian function centered at a different time point in the reach
+    Phi = np.exp(-0.5 * ((t - centers[None, :]) / width) ** 2) 
+
+    # normalize each basis function to have a maximum value of 1, preventing numerical issues with very small values and ensuring 
+    # that the feedforward command can scale appropriately based on the learned weights without being dominated by the shape of the basis functions
+    Phi /= np.maximum(Phi.max(axis=0, keepdims=True), 1e-12) 
     
     return Phi
 
@@ -406,7 +420,8 @@ def simulate_reach(
     perturbation: Optional[Perturbation] = None,
     x0: Optional[Array] = None,
     rng: Optional[np.random.Generator] = None): 
-        """ simulates a reach trajectory under LQG control with cerebellar adaptation and optional perturbations. Returns the state trajectory, control inputs, and cost for the trial. """
+        """ simulates a reach trajectory under LQG control with cerebellar adaptation and optional perturbations. 
+        Returns the state trajectory, control inputs, and cost for the trial. """
 
         if rng is None: 
             rng = np.random.default_rng()
