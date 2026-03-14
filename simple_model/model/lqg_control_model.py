@@ -93,7 +93,7 @@ class Perturbation:
     duration: int = 5 # duration of perturbation in time steps
     pulse: np.array = None # shape (2,) for motor output pulse
     observer_bias: np.ndarray = None # shape (4,) for mossy perturbation bias on state observation
-    general_noise_std: float = 0.15 # standard deviation of noise added to control input for general perturbation
+    general_noise_std: float = 0.5 # standard deviation of noise added to control input for general perturbation
 
     def __post_init__(self) -> None:
         valid_kinds = {None, "mossy", "inta_rn", "inta_general"}
@@ -102,14 +102,14 @@ class Perturbation:
             raise ValueError(f"kind must be one of {valid_kinds}, got {self.kind!r}")
 
         if self.pulse is None:
-            self.pulse = np.array([-4.0, -3.0], dtype=float) # stronger braking force for inta_rn and inta_general perturbations
+            self.pulse = np.array([-15.0, -10.0], dtype=float) # strong braking force to create visible behavioral effects
         else:
             self.pulse = np.asarray(self.pulse, dtype=float)
             if self.pulse.shape != (2,):
                 raise ValueError("pulse must have shape (2,) for [u_out, u_up].")
 
         if self.observer_bias is None:
-            self.observer_bias = np.array([0.0, 0.0, 2.0, 1.5], dtype=float) # adjust velocity bias to have stronger effect on velocity estimation
+            self.observer_bias = np.array([0.0, 0.0, 3.0, 2.5], dtype=float) # strong velocity bias for visible prediction errors
         else:
             self.observer_bias = np.asarray(self.observer_bias, dtype=float)
             if self.observer_bias.shape != (4,):
