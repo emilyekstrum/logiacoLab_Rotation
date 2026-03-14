@@ -90,7 +90,7 @@ class Perturbation:
 
     kind: str = None # None, mossy, inta_rn, inta_general
     onset_idx: int = 45 # start of perturbation in time steps, relative to reach onset
-    duration: int = 5 # duration of perturbation in time steps
+    duration: int = 15 # duration of perturbation in time steps (150ms for visible position effects)
     pulse: np.array = None # shape (2,) for motor output pulse
     observer_bias: np.ndarray = None # shape (4,) for mossy perturbation bias on state observation
     general_noise_std: float = 0.5 # standard deviation of noise added to control input for general perturbation
@@ -276,10 +276,10 @@ def train_with_adaptation(
     if rng is None:
         rng = np.random.default_rng()
     
-    # Initialize weights
+    # initialize weights
     ff_weights = controller.make_default_ff_weights(n_basis=Phi.shape[1])
     
-    # Storage for history
+    # storage for history
     n_basis = Phi.shape[1]
     ff_weights_history = np.zeros((n_trials + 1, n_basis, 2))
     ff_weights_history[0] = ff_weights.copy()
@@ -287,27 +287,27 @@ def train_with_adaptation(
     cost_history = np.zeros(n_trials)
     endpoint_error_history = np.zeros(n_trials)
     
-    # Store full trial data for selected trials
+    # store full trial data for selected trials
     save_trial_indices = [0, n_trials//4, n_trials//2, 3*n_trials//4, n_trials-1]
     trials_data = {}
     
-    # Determine perturbation schedule
+    # determine perturbation schedule
     if perturbation_trials is None and perturbation is not None:
-        # Apply perturbation to all trials
+        # apply perturbation to all trials
         pert_start, pert_end = 0, n_trials
     elif perturbation_trials is not None:
         pert_start, pert_end = perturbation_trials
     else:
-        pert_start, pert_end = 0, 0  # No perturbation
+        pert_start, pert_end = 0, 0  # no perturbation
     
     for trial in range(n_trials):
-        # Determine if this trial has perturbation
+        # determine if this trial has perturbation
         if perturbation is not None and pert_start <= trial < pert_end:
             trial_pert = perturbation
         else:
             trial_pert = None
         
-        # Simulate reach
+        # simulate reach
         result = controller.simulate_reach(
             Phi=Phi,
             ff_weights=ff_weights,
@@ -315,16 +315,16 @@ def train_with_adaptation(
             rng=rng
         )
         
-        # Record metrics
+        # record metrics
         cost_history[trial] = result['J']
         endpoint_error = np.linalg.norm(result['x'][-1, :2] - controller.params.target[:2])
         endpoint_error_history[trial] = endpoint_error
         
-        # Save full trial data for selected trials
+        # save full trial data for selected trials
         if trial in save_trial_indices:
             trials_data[trial] = result
         
-        # Update weights based on prediction errors
+        # update weights based on prediction errors
         ff_weights = update_feedforward_weights(
             ff_weights=ff_weights,
             Phi=Phi,
@@ -434,34 +434,34 @@ def simulate_reach(
 
         target = params.target
 
-        # Compute initial control (will be applied at t=1)
+        # compute initial control (will be applied at t=1)
         state_error = xhat[0] - target
         u_nom[0] = -K @ state_error + u_ff[0]
         u_app[0] = u_nom[0].copy()
 
         for t in range(1, T):
-            # Apply motor output perturbations to the control that will affect THIS timestep
-            # This ensures perturbation affects x[t] exactly when onset_idx <= t < onset_idx + duration
+            # apply motor output perturbations to the control that will affect THIS timestep
+            # ensures perturbation affects x[t] when onset_idx <= t < onset_idx + duration
             u_to_apply = u_app[t-1].copy()
             
             if perturbation is not None and perturbation.kind in ['inta_rn', 'inta_general']:
                 if perturbation.onset_idx <= t < perturbation.onset_idx + perturbation.duration:
                     u_to_apply += perturbation.pulse
                     
-                    # Add noise only during perturbation window for inta_general
+                    # add noise only during perturbation window for inta_general
                     if perturbation.kind == 'inta_general':
                         u_to_apply += rng.normal(0, perturbation.general_noise_std, size=2)
             
-            # Plant update - uses the potentially perturbed control
+            # plant update - uses the potentially perturbed control
             proc_noise = rng.multivariate_normal(np.zeros(4), W)
             x[t] = A @ x[t-1] + B @ u_to_apply + proc_noise
 
-            # Observation of current state
+            # observation of current state
             obs_noise = rng.multivariate_normal(np.zeros(4), V)
             y[t] = C @ x[t] + obs_noise
 
-            # Estimator prediction (what we expected to see)
-            # Uses the UNPERTURBED control from internal model's perspective
+            # estimator prediction
+            # uses the UNPERTURBED control from internal model's perspective
             xhat_pred[t] = A @ xhat[t-1] + B @ u_app[t-1]
 
             # Mossy fiber perturbation enters observer/internal model
@@ -469,16 +469,16 @@ def simulate_reach(
                 if perturbation.onset_idx <= t < perturbation.onset_idx + perturbation.duration:
                     xhat_pred[t] += perturbation.observer_bias
 
-            # Predicted observation
+            # predicted observation
             yhat[t] = C @ xhat_pred[t]
 
-            # Prediction error
+            # prediction error
             ytilde[t] = y[t] - yhat[t]
             
-            # Correction step (Kalman update)
+            # correction step (Kalman update)
             xhat[t] = xhat_pred[t] + L @ ytilde[t]
 
-            # Compute control for NEXT timestep based on current estimate
+            # compute control for NEXT timestep based on current estimate
             state_error = xhat[t] - target
             u_nom[t] = -K @ state_error + u_ff[t]
             u_app[t] = u_nom[t].copy()
