@@ -19,6 +19,8 @@ Intenral model/estimator: Cerebellum
 
 Controller: motor circuits / motor cortex 
 
+Plant: arm dynamics
+
 Parameters: 
 A: State transition matrix representing the dynamics of the system. 
     - array (4, 4): 4D state space.
@@ -52,7 +54,7 @@ class LQGParams:
     
     dt: float = 0.01 # 10 ms time bins
     drag: float = 0.92 #velocity retention
-    control_gain: float = 0.1 # command -> acceleration gain
+    control_gain: float = 1.0 # command -> acceleration gain (increased from 0.1 to allow reaching the target)
 
     # noise covariances
     W_scale: float = 1e-4 # process noise 
@@ -79,7 +81,12 @@ class LQGParams:
             
 @dataclass
 class Perturbation:
-    """ Perturbation configuration"""
+    """ Perturbation configuration
+    
+    - mossy fiber perturbation: bias added to the predicted state in the internal model, simulating altered sensory input to the cerebellum
+    - intA/RN perturbation: pulse added to the motor output, simulating a brief disruption of motor commands
+    - intA general perturbation: pulse plus noise added to the motor output, simulating a more general disruption of motor commands that includes variability
+    """
 
     kind: str = None # None, mossy, inta_rn, inta_general
     onset_idx: int = 45 # start of perturbation in time steps, relative to reach onset
@@ -427,48 +434,50 @@ def simulate_reach(
 
         target = params.target
 
-        for t in range(1, T):
-            # prediction step
-            xhat_pred[t] = A @ xhat[t-1] + B @ u_app[t-1] # predict next state based on previous state estimate and applied control input
+        # Compute initial control (will be applied at t=1)
+        state_error = xhat[0] - target
+        u_nom[0] = -K @ state_error + u_ff[0]
+        u_app[0] = u_nom[0].copy()
 
-            # mossy fiber perturbation enters observer/internal model
+        for t in range(1, T):
+            # Plant update FIRST - uses control from previous timestep
+            proc_noise = rng.multivariate_normal(np.zeros(4), W)
+            x[t] = A @ x[t-1] + B @ u_app[t-1] + proc_noise
+
+            # Observation of current state
+            obs_noise = rng.multivariate_normal(np.zeros(4), V)
+            y[t] = C @ x[t] + obs_noise
+
+            # Estimator prediction (what we expected to see)
+            xhat_pred[t] = A @ xhat[t-1] + B @ u_app[t-1]
+
+            # Mossy fiber perturbation enters observer/internal model
             if perturbation is not None and perturbation.kind == "mossy":
                 if perturbation.onset_idx <= t < perturbation.onset_idx + perturbation.duration:
-                    xhat_pred[t] += perturbation.observer_bias # add bias to predicted state to simulate altered sensory input from mossy fiber perturbation
+                    xhat_pred[t] += perturbation.observer_bias
 
-            # predicted observation
-            yhat[t] = C @ xhat_pred[t] 
+            # Predicted observation
+            yhat[t] = C @ xhat_pred[t]
 
-            # real observation
-            obs_noise = rng.multivariate_normal(np.zeros(4), V) # sample measurement noise for current time step
-            y[t] = C @ x[t] + obs_noise # true observation with measurement noise
-
-            # prediction error
-            ytilde[t] = y[t] - yhat[t] # compute observation prediction error
+            # Prediction error
+            ytilde[t] = y[t] - yhat[t]
             
-            # correction step (Kalman update)
-            xhat[t] = xhat_pred[t] + L @ ytilde[t] # correct predicted state using Kalman gain and observation error
+            # Correction step (Kalman update)
+            xhat[t] = xhat_pred[t] + L @ ytilde[t]
 
-            #control around target state
-            state_error = xhat[t] - target # compute error between current state estimate and target state
-            u_nom[t] = -K @ state_error + u_ff[t] # compute nominal control input from feedback controller
+            # Compute control for NEXT timestep based on current estimate
+            state_error = xhat[t] - target
+            u_nom[t] = -K @ state_error + u_ff[t]
 
-            # applied control perturbed at output
+            # Applied control perturbed at output
             u_app[t] = u_nom[t].copy()
 
             if perturbation is not None and perturbation.kind in ['inta_rn', 'inta_general']:
                 if perturbation.onset_idx <= t < perturbation.onset_idx + perturbation.duration:
-                    u_app[t] += perturbation.pulse # add perturbation pulse to control input to simulate intra-cerebellar or general motor output perturbation
+                    u_app[t] += perturbation.pulse
 
                 if perturbation.kind == 'inta_general':
-                    # make less selective
-                    u_app[t] += rng.normal(0, 0.5, size=2) # add some random noise to the control input to simulate a more general perturbation that affects multiple aspects of motor output
-
-            # process noise
-            proc_noise = rng.multivariate_normal(np.zeros(4), W) # sample process noise for current time step
-
-            # plant update - use u_app[t-1] not u_app[t] to maintain causality
-            x[t] = A @ x[t-1] + B @ u_app[t-1] + proc_noise # update true state based on previous state, applied control input, and process noise
+                    u_app[t] += rng.normal(0, 0.5, size=2)
 
 
         # trial cost
