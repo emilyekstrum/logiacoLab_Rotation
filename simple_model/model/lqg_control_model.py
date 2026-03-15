@@ -38,6 +38,19 @@ W: Process noise covariance matrix representing the uncertainty in the system dy
     - array (4, 4): 4D state space.
 V: Measurement noise covariance matrix representing the uncertainty in the observations.
     - array (4, 4): 4D observation.
+
+Perturbations:
+- Mossy fiber perturbation: bias added to the predicted state in the internal model, simulating altered sensory input to the cerebellum.
+    - xhat_pred(t) = A xhat(t-1) + B u_app(t-1) + observer_bias (during perturbation window)
+        - observer_bias = velocity bias added (increased outward and upward velocity during perturbation)
+
+- intA/RN perturbation: pulse added to the motor output, simulating a brief disruption of motor commands.
+     - u_app(t) = u_nom(t) + u_ff(t) + pulse (during perturbation window)
+        - pulse = strong braking force added to both outward and upward control inputs during perturbation window
+
+- intA general perturbation: pulse plus noise added to the motor output, simulating a more general disruption of motor commands that includes variability.
+    - u_app(t) = u_nom(t) + u_ff(t) + pulse + noise (during perturbation window)
+        - noise = random variability added to control inputs during perturbation window, in addition to the pulse, to simulate a more general disruption of motor commands that includes variability
 """
 
 import numpy as np
